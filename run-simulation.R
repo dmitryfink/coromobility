@@ -60,11 +60,12 @@ stan_data$X[,1,]
 
 # Running HMC -------------------------------------------------------------
 
-options(mc.cores = parallel::detectCores())
+# options(mc.cores = parallel::detectCores())
+options(mc.cores = 10)
 rstan_options(auto_write = TRUE)
 invisible(map(stan_data, ~ print(str(.x) )))
 
-m <- stan_model(paste0('stan-models/',StanModel,'.stan'))
+m <- stan_model(paste0('model.stan'))
 # fit.debug = sampling(m, data=stan_data,iter=40,warmup=20,chains=1)
 
 fit = sampling(m,data=stan_data,iter=1500,warmup=700,chains=4,thin=1,control = list(adapt_delta = 0.96, max_treedepth = 11))
@@ -83,5 +84,5 @@ print(fit)
 
 out = rstan::extract(fit)
 
-save(out, cases2, stan_data, file='stan.out3.rdata.xz', compress = 'xz')
+save(out, cases2, stan_data, file='out/stan.out3.rdata.xz', compress = 'xz')
 
