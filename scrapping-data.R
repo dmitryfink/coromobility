@@ -34,29 +34,38 @@ cases[['Moscow']] <- get_wiki_table(outbreak_webpage,4,3) %>% .[,c('Москва
 
 ## St Petersburg
 cases[['Saint Petersburg - Russia']] <- get_wiki_table(outbreak_webpage,6,3) %>% .[,c('СанктПетербург_ДАТА', 'СанктПетербург_смертей_новых')] %>% 
-	set_names(c('date', 'deaths')) %>% mutate(date = as_date(strptime(date, '%d.%m.%Y')), deaths = as.numeric(deaths)) %>% arrange(date)%>% as_tibble
-	
+	set_names(c('date', 'deaths')) %>% mutate(date = as_date(strptime(date, '%d.%m.%Y')), deaths = as.numeric(deaths)) %>% arrange(date)%>% as_tibble %>% replace_na(list(deaths=0))
+
+# According to Russian authoritis the number of death from pneumonia is about twice the covid:
+cases[['Saint Petersburg - Russia']]	<- cases[['Saint Petersburg - Russia']] %>% mutate(deaths = deaths * 3 )
+
 ## London
 wp_page_url <- "https://en.wikipedia.org/wiki/2020_coronavirus_pandemic_in_London"
 outbreak_webpage <- read_html(wp_page_url)
-t.cases <- get_wiki_table(outbreak_webpage,3,1)
+t.cases <- get_wiki_table(outbreak_webpage,2,1)
 cases[['London']] <- t.cases %>% select(Date, Newdeaths) %>% mutate(date = as_date( str_c('2020-',Date) ), deaths = as.numeric(str_extract(Newdeaths, '^\\d* '))) %>% select(date, deaths) %>% arrange(date) %>% na.omit %>% as_tibble
 
-
+# cases[['London']] %>% tail
 new_data <- tibble(date=c('2020-04-13', '2020-04-14', '2020-04-15', '2020-04-16', '2020-04-17', '2020-04-18',  '2020-04-19', '2020-04-20',  '2020-04-21','2020-04-22', '2020-04-23', '2020-04-24', '2020-04-25', '2020-04-26', '2020-04-27', 
-						'2020-04-28', '2020-04-29', '2020-04-30', '2020-05-01', '2020-05-02',  '2020-05-03', '2020-05-04','2020-05-05'), 
-		deaths = c(206, 153, 153,145,221, 82, 81, 132, 173, 89, 126, 116, 64, 87, 88, 109, 86, 71, 51, 58, 22, 53, 64) ) %>% mutate(date=as_date(date))
+						'2020-04-28', '2020-04-29', '2020-04-30', '2020-05-01', '2020-05-02',  '2020-05-03', '2020-05-04','2020-05-05','2020-05-06','2020-05-07','2020-05-08','2020-05-09' ), 
+		deaths = c(206, 153, 153,145,221, 82, 81, 132, 173, 89, 126, 116, 64, 87, 88, 109, 86, 71, 51, 58, 22, 53, 64, 132, 93, 23, 25) ) %>% mutate(date=as_date(date))
 
 cases[['London']] <- cases[['London']] %>% bind_rows(new_data)
 # cases[['London']] %>% tail
 
 ## NY
 # wp_page_url <- 'https://en.wikipedia.org/wiki/2020_coronavirus_pandemic_in_New_York_City'
+
 wp_page_url <- 'https://commons.wikimedia.org/wiki/Data:COVID-19_cases_in_New_York_City.tab'
 outbreak_webpage <- read_html(wp_page_url)
 t.cases <- get_wiki_table(outbreak_webpage,1,3)
 cases[['New York City']] <- t.cases %>% rename(date = date_string_Date, deaths = deaths_per_day_number_Deathsperday) %>%
 	select(date, deaths) %>% mutate(date=as_date(date), deaths = as.numeric(deaths)) %>% arrange(date) %>% as_tibble
+
+# using the data from https://www1.nyc.gov/site/doh/covid/covid-19-data.page
+t.cases <- read_csv(file = "data/data-4SfjZ.csv", col_types = list(DATE_OF_INTEREST=col_date(format='%m/%d/%y'))) %>% mutate(date = as_date(DATE_OF_INTEREST)) %>% rename(deaths = Deaths) %>% select(date, deaths)
+cases[['New York City']] <- t.cases %>% arrange(date)
+# cases[['New York City']] %>% tail
 
 ## Berlin
 
@@ -65,7 +74,9 @@ outbreak_webpage <- read_html(wp_page_url)
 t.cases <- get_wiki_table(outbreak_webpage,3,3)
 
 cases[['Berlin']] <- t.cases %>% rename(date = Date_Date_Date, deaths = States_Berlin_) %>% select(date, deaths) %>% filter(str_detect(date, '^\\d')) %>% 
-	mutate(deaths = as.numeric(str_replace_all(str_extract(deaths, '\\(.*\\)'),'[)(]','')), date = paste(date, '2020'), date=as_date(strptime(date, '%d %b %y'))) %>% arrange(date) %>% 
+	mutate(deaths = as.numeric(str_replace_all(str_extract(deaths, '\\(.*\\)'),'[)(]','')), date = paste(date, '2020')) %>% 
+	mutate(date = str_replace(date, 'May', '05')) %>% mutate(date = str_replace(date, 'Apr', '04'))%>% mutate(date = str_replace(date, 'Mar', '03')) %>%  mutate(date = str_replace(date, 'Feb', '02')) %>% 
+	mutate(date=as_date(strptime(date, '%d %m %y')))  %>% arrange(date) %>% 
 	mutate(deaths = c(0,diff(deaths)))
 
 ##paris
@@ -111,8 +122,11 @@ cases[['Madrid']] <- t.cases %>% rename(region = !!"Comunitat Autònoma", deaths
 
 #https://www.statista.com/statistics/1105401/coronavirus-covid-19-cases-cities-districts-germany/
 
+map(cases, ~tail(.x))
+# cases[['Berlin']] <- cases[['Berlin']] %>% mutate(deaths = stats::filter(deaths, sides=1, filter = rep(1/4,4)))
 
-amob <- read_csv('data/applemobilitytrends-2020-05-05.csv') 
+
+amob <- read_csv('data/applemobilitytrends-2020-05-08.csv') 
 
 cases1 <- list()
 for (ncase in names(cases)){
@@ -127,11 +141,9 @@ for (ncase in names(cases)){
 
 mob.data %>% filter(date=='2020-03-01')
 
-# library(forecast)
 cases1[map_dbl(cases1, ~ nrow(.x) ) == 0] <- NULL
 print(map_dbl(cases1, ~ nrow(.x) ))
-tail(cases1$Berlin)
-tail(cases1$Madrid)
+
 
 save(cases1, cases, file = 'data/city_mobility.rdata')
 # load(file = 'data/city_mobility.rdata')

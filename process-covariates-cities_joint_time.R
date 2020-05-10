@@ -64,13 +64,16 @@ process_covariates_city <- function(region.data, region.stat, ifr.stats, forecas
   conv.features.names <- c('mean', 'spread')
   pca.matrix <- matrix(c(0.5,0.5,1,-1), ncol=2, dimnames=list(NULL,conv.features.names ))
   region.data <- map(region.data, ~ .x %>% select(!!c(key.stat, feature.names)) %>% bind_cols(.x[feature.names] %>% as.matrix %*% pca.matrix %>% as_tibble) %>% select( - !!feature.names)) 
+  region.data <- map(
+    region.data, ~ .x %>% mutate(deaths = stats::filter(deaths, rep(1/4,4), sides = 1) %>% as.numeric %>% round %>% na.fill0(0))
+  )
   
-  
-  # region.data <- cases2
+  deaths.mx <- map( region.data, ~ .x['deaths'] %>% add_row(deaths = rep(-1, forecast)) ) %>% 
+    bind_cols() %>% set_names(names(region.data))
   
   stan_data <- list(M     = M, 
                     N2    = N2,
-                   deaths = map( region.data, ~ .x['deaths'] %>% add_row(deaths = rep(-1, forecast)) ) %>% bind_cols() %>% set_names(names(region.data)),
+                   deaths = deaths.mx,
                    f      = fmx,
                    SI     = serial.interval$fit[1:N2],
                    X      = abind(map( region.data, ~ .x[,conv.features.names] %>% bind_rows(NA *.x[1:forecast,conv.features.names]) %>% na.locf), along=-1), #add new data as placeholders for the values to be forecasted
@@ -78,13 +81,13 @@ process_covariates_city <- function(region.data, region.stat, ifr.stats, forecas
                    pop = region.stat[match( names(region.data), region.stat$region) %>% na.omit , 'population', drop= T],
                    pop_density = region.stat[match( names(region.data), region.stat$region) %>% na.omit , 'density', drop= T]
     )
-  
-  stan_data$pop_density <- stan_data$pop_density / max(stan_data$pop_density)
+  stan_data$deaths <- round(stan_data$deaths)
+  stan_data$pop_density <- stan_data$pop_density / mean(stan_data$pop_density)
   stan_data$x=1:N2
   stan_data$N0 <- 4
   stan_data$N <- rep(N, M)
   stan_data$P = length(feature.names)
   stopifnot(dim(stan_data$X) == c(stan_data$M, stan_data$N2, stan_data$P ))
-  return(list("stan_data" = stan_data))
+  stan_data
 }
 

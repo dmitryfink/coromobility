@@ -28,13 +28,13 @@ data {
 }
 
 transformed data {
-  matrix[N2, P+2] Xa[M]; // features matrix
+  // matrix[N2, P+2] Xa[M]; // features matrix
   vector[N2] SI_rev; // SI in reverse order
   vector[N2] f_rev[M]; // f in reversed order
   
-  for (i in 1:M){
-    Xa[i] = append_col(X[i], rep_matrix(1.0, N2, 1));  // adding bias
-  };  
+  // for (i in 1:M){
+  //   Xa[i] = append_col(X[i], rep_matrix(1.0, N2, 1));  // adding bias
+  // };  
   
   for(i in 1:N2)
     SI_rev[i] = SI[N2-i+1];
@@ -48,7 +48,8 @@ transformed data {
 
 parameters {
   real<lower=0> mu[M]; // intercept for Rt
-  vector[P + 1] alpha;  //number of features + bias
+  vector[P] alpha[M];  //number of features
+  real alpha_bias[M];
   real<lower=0> gamma;
   real<lower=0> kappa;
   real<lower=0> y[M]; // average number of new cases per day, used as a prior
@@ -56,7 +57,7 @@ parameters {
   real<lower=0> tau;
   real <lower=0> ifr_noise[M];
   real <lower=0, upper=10> beta_power;
-  real <lower=0, upper=10> density_power;
+  real <lower=-1, upper=2> density_power[M];
 }
 
 transformed parameters {
@@ -77,8 +78,10 @@ transformed parameters {
       // total_cases[2:N0,m] = cumulative_sum(predicted_daily_new_cases[2:N0,m]); // total number of cases per region
       total_cases[2:EpidemicStart[m],m] = cumulative_sum(predicted_daily_new_cases[2:EpidemicStart[m],m]); // total number of cases per region
       
-      // Rt[,m] = mu[m] * exp( Xa[m] * alpha );  
-      Rt[,m] = mu[m] * relu_power( Xa[m] * alpha, beta_power) * (pop_density[m]^density_power) ; // !!!!!!!!!!!!!!!!!!
+      Rt[,m] = mu[m] * exp( X[m] * alpha[m] + alpha_bias[m] ) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!;
+      
+      // Rt[,m] = mu[m] * exp( Xa[m] * alpha ) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!;
+      // Rt[,m] = mu[m] * relu_power( Xa[m] * alpha, beta_power) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!
       
       Rt_adj[1:EpidemicStart[m],m] = Rt[1:EpidemicStart[m],m];
       for (i in (EpidemicStart[m]+1):N2) {
@@ -100,17 +103,19 @@ model {
   for (m in 1:M){
     y[m] ~ exponential(1/tau);
   }
-  beta_power ~ normal(0.6,1);
-  alpha[1] ~ normal(1,0.5);
-  alpha[2] ~ normal(0,0.5);
-  // alpha[3] ~ normal(-1,0.5);
-  alpha[3] ~ normal(0, 0.5);
+  // beta_power ~ normal(0.6,1);
+  for ( i in 1:M){
+    alpha[i][1] ~ normal(1,0.5);
+    alpha[i][2] ~ normal(0,0.5);
+  }
+  alpha_bias ~ normal(-1,1);
+  // alpha[3] ~ normal(0, 0.5);
   gamma ~ normal(0, .2);
 
   phi ~ normal(0,5);
   kappa ~ normal(0,0.5);
   mu ~ normal(3.28, kappa); // citation: https://academic.oup.com/jtm/article/27/2/taaa021/5735319
-  density_power ~ normal(0.6,1);
+  density_power ~ normal(0.7,1);
   ifr_noise ~ normal(1,0.1);
   for(m in 1:M){
     deaths[EpidemicStart[m]:N[m], m] ~ neg_binomial_2(E_deaths[EpidemicStart[m]:N[m], m], phi);
