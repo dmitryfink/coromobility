@@ -78,6 +78,20 @@ cases[['Berlin']] <- t.cases %>% rename(date = Date_Date_Date, deaths = States_B
 	mutate(date = str_replace(date, 'May', '05')) %>% mutate(date = str_replace(date, 'Apr', '04'))%>% mutate(date = str_replace(date, 'Mar', '03')) %>%  mutate(date = str_replace(date, 'Feb', '02')) %>% 
 	mutate(date=as_date(strptime(date, '%d %m %y')))  %>% arrange(date) %>% 
 	mutate(deaths = c(0,diff(deaths)))
+# 
+# cases[['Berlin']] %>% ggplot(aes(x=date, y=deaths)) + geom_line()
+# 
+# cases[['Berlin']] %>% 
+# 	mutate(adeaths = stats::filter(deaths, rep(1/10,10), sides=1)) %>%
+# 	ggplot(aes(x=date, y=deaths)) + 
+# 	geom_line(aes(col='red'))+geom_line(aes(y=adeaths, col='black'))
+# 
+# cases[['Berlin']] %>% 
+# 	mutate(adeaths = rev(stats::filter(rev(deaths), rep(1/10,10), sides=1)) ) %>%
+# 	mutate(adeaths = lag(adeaths, 9) ) %>%
+# 	ggplot(aes(x=date, y=deaths)) + 
+# 	geom_line(aes(col='origin'))+geom_line(aes(y=adeaths, col='filtered'))
+
 
 ##paris
 ## https://github.com/opencovid19-fr/data

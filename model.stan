@@ -17,7 +17,7 @@ data {
   int <lower=1> P; // number of covariates
   int <lower=1> N0; // index of the first day, since which we need to impute infections
   int<lower=1> N[M]; // index of the last observed data for city m
-  int<lower=1> N2; // days of observed data + # of days to forecast
+  int<lower=1> N2; // days of observed data + number of days to forecast
   int deaths[N2, M]; // reported deaths -- the rows with i > N contain -1 and should be ignored
   matrix[N2, M] f; // h * s, daily density of fatality rate
   matrix[N2, P] X[M]; // features matrix, currently mean mobility and spread between mobility driving and walking
@@ -56,8 +56,8 @@ parameters {
   real<lower=0> phi;
   real<lower=0> tau;
   real <lower=0> ifr_noise[M];
-  real <lower=0, upper=10> beta_power;
-  real <lower=-1, upper=2> density_power[M];
+  // real <lower=0, upper=10> beta_power;
+  // real <lower=-1, upper=2> density_power[M];
 }
 
 transformed parameters {
@@ -71,17 +71,18 @@ transformed parameters {
     
     for (m in 1:M){
 
-      // DF predicted_daily_new_cases[1:N0, m] = rep_vector(y[m], N0); // learn the number of NEW cases in the first N0 days
-      
       predicted_daily_new_cases[(EpidemicStart[m]-N0+1):EpidemicStart[m], m] = rep_vector(y[m], N0);
       
-      // total_cases[2:N0,m] = cumulative_sum(predicted_daily_new_cases[2:N0,m]); // total number of cases per region
       total_cases[2:EpidemicStart[m],m] = cumulative_sum(predicted_daily_new_cases[2:EpidemicStart[m],m]); // total number of cases per region
       
-      Rt[,m] = mu[m] * exp( X[m] * alpha[m] + alpha_bias[m] ) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!;
+      // model 1:
+      Rt[,m] = mu[m] * exp( X[m] * alpha[m] + alpha_bias[m] );
       
-      // Rt[,m] = mu[m] * exp( Xa[m] * alpha ) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!;
-      // Rt[,m] = mu[m] * relu_power( Xa[m] * alpha, beta_power) * (pop_density[m]^density_power[m]) ; // !!!!!!!!!!!!!!!!!!
+      // model 2:
+      // Rt[,m] = mu[m] * exp( X[m] * alpha[m] + alpha_bias[m] ) * (pop_density[m]^density_power[m]) ;
+      
+      // model 3:
+      // Rt[,m] = mu[m] * relu_power( Xa[m] * alpha[m] + alpha_bias[m], beta_power) * (pop_density[m]^density_power[m]) ;
       
       Rt_adj[1:EpidemicStart[m],m] = Rt[1:EpidemicStart[m],m];
       for (i in (EpidemicStart[m]+1):N2) {
@@ -109,13 +110,12 @@ model {
     alpha[i][2] ~ normal(0,0.5);
   }
   alpha_bias ~ normal(-1,1);
-  // alpha[3] ~ normal(0, 0.5);
   gamma ~ normal(0, .2);
 
   phi ~ normal(0,5);
   kappa ~ normal(0,0.5);
   mu ~ normal(3.28, kappa); // citation: https://academic.oup.com/jtm/article/27/2/taaa021/5735319
-  density_power ~ normal(0.7,1);
+  // density_power ~ normal(0.7,1); //necessary for other models
   ifr_noise ~ normal(1,0.1);
   for(m in 1:M){
     deaths[EpidemicStart[m]:N[m], m] ~ neg_binomial_2(E_deaths[EpidemicStart[m]:N[m], m], phi);

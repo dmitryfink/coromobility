@@ -53,13 +53,10 @@ process_covariates_city <- function(region.data, region.stat, ifr.stats, forecas
   }) %>% bind_cols()
   key.stat <- c('date', 'deaths')
   feature.names <- c('walking', 'driving')
-  # set_mx_cols <- function(mx, new.colnames){
-  #   colnames(mx) <- new.colnames
-  #   mx
-  # }
-  
+
   epidemic.start.idxs <- map_dbl(region.data, ~which(cumsum(.x$deaths)>=10)[1]) - 30
   stopifnot(all(epidemic.start.idxs > 1))
+  
   #transform features to avoid multicollinearity:
   conv.features.names <- c('mean', 'spread')
   pca.matrix <- matrix(c(0.5,0.5,1,-1), ncol=2, dimnames=list(NULL,conv.features.names ))
